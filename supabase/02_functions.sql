@@ -156,11 +156,16 @@ end $$;
 create or replace function public.trg_sale_changed()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
-  v_trip public.trips%rowtype; v_ortaci text; r record; v_row record;
+  v_trip public.trips%rowtype; v_ortaci text; r record; v_trip_id uuid;
 begin
-  v_row := coalesce(new, old);
-  perform public.recalc_trip(v_row.trip_id);
-  select * into v_trip from public.trips where id = v_row.trip_id;
+  if tg_op = 'DELETE' then
+    v_trip_id := old.trip_id;
+  else
+    v_trip_id := new.trip_id;
+  end if;
+
+  perform public.recalc_trip(v_trip_id);
+  select * into v_trip from public.trips where id = v_trip_id;
 
   if tg_op = 'INSERT' then
     select full_name into v_ortaci from public.profiles where id = v_trip.ortaci_id;
@@ -175,7 +180,8 @@ begin
       || ' — tur toplamı ' || public.money(v_trip.total_amount), v_trip.id);
   end if;
 
-  return v_row;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
 end $$;
 
 drop trigger if exists sales_after_change on public.sales;
@@ -557,6 +563,7 @@ begin
      and s.code_hash = extensions.crypt(p_code, s.code_hash);
 end $$;
 revoke all on function public.login_lookup(text) from public, anon, authenticated;
+grant execute on function public.login_lookup(text) to service_role;
 
 -- Kullanıcı oluşturma/şifre atama (service_role tarafından Edge Function ile çağrılır)
 create or replace function public.upsert_user_secret(
@@ -593,3 +600,4 @@ begin
          updated_at       = now();
 end $$;
 revoke all on function public.upsert_user_secret(uuid, text, text, text) from public, anon, authenticated;
+grant execute on function public.upsert_user_secret(uuid, text, text, text) to service_role;

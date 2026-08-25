@@ -35,7 +35,8 @@ create policy profiles_admin_all on public.profiles for all to authenticated
 create or replace function public.trg_profile_guard()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_admin() then
+  -- auth.uid() boşsa çağrı service_role'dendir (Edge Function): serbest bırak
+  if auth.uid() is not null and not public.is_admin() then
     if new.role <> old.role or new.is_active <> old.is_active
        or new.full_name <> old.full_name then
       raise exception 'Bu alanları yalnızca yönetici değiştirebilir.' using errcode='42501';
