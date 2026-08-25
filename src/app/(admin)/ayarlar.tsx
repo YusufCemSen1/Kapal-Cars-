@@ -146,6 +146,7 @@ export default function AdminAyarlar() {
       <Kart style={{ gap: bosluk.xs }}>
         <Text style={st.kartBaslik}>Hesap</Text>
         <Satir etiket="Ad" deger={profil?.full_name ?? "—"} />
+        <Satir etiket="Kullanıcı adı" deger={profil?.username ?? "—"} />
         <Satir etiket="Görev" deger="Yönetici" />
         <Dugme
           baslik="Çıkış yap"

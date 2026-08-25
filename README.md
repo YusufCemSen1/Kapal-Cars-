@@ -38,9 +38,10 @@ hiçbir tabloyu doğrudan okuyamaz, yalnızca kendilerine açılmış RPC uçlar
 
 ## Giriş
 
-Kullanıcı adı yoktur. Herkes yöneticinin verdiği **kişisel şifre** ile girer.
-Hesapları yalnızca yönetici oluşturur (Kullanıcılar sekmesi). Şifre üretildiğinde bir kez
-gösterilir; sonra yalnızca yenilenebilir.
+Herkes yöneticinin verdiği **kullanıcı adı + kişisel şifre** ile girer.
+Hesapları yalnızca yönetici oluşturur (Kullanıcılar sekmesi). Kullanıcı adı 3-24 karakter,
+küçük harf/rakam/nokta/alt çizgi olabilir. Şifre üretildiğinde bir kez gösterilir; sonra
+yalnızca yenilenebilir.
 
 ---
 
@@ -107,7 +108,7 @@ eas build --platform android
 ```
 src/
   app/                 ekranlar (expo-router)
-    giris.tsx          kişisel şifre ile giriş
+    giris.tsx          kullanıcı adı + kişisel şifre ile giriş
     (sofor)/           müşteri bildir · turlarım
     (ortaci)/          müsaitlik · alışveriş girişi · geçmiş
     (admin)/           canlı durum · turlar · rapor · kullanıcılar · ayarlar

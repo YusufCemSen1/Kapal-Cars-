@@ -8,6 +8,13 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const ROLES = ["admin", "sofor", "ortaci"];
+const USERNAME_RE = /^[a-z0-9._]{3,24}$/;
+
+/** Kullanıcı adını normalleştirir; kurala uymuyorsa null döner. */
+function normalizeUsername(raw: unknown): string | null {
+  const u = String(raw ?? "").trim().toLowerCase();
+  return USERNAME_RE.test(u) ? u : null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -45,8 +52,14 @@ Deno.serve(async (req) => {
       case "create": {
         const fullName = String(body.full_name ?? "").trim();
         const role = String(body.role ?? "");
+        const username = normalizeUsername(body.username);
         if (fullName.length < 2) return fail("İsim en az 2 karakter olmalı.");
         if (!ROLES.includes(role)) return fail("Geçersiz rol.");
+        if (!username) {
+          return fail(
+            "Kullanıcı adı 3-24 karakter olmalı; sadece küçük harf, rakam, nokta ve alt çizgi.",
+          );
+        }
 
         const code = String(body.code ?? "").trim() || randomCode();
         if (code.length < 4) return fail("Şifre en az 4 karakter olmalı.");
@@ -63,13 +76,19 @@ Deno.serve(async (req) => {
 
         const { error: profileErr } = await admin.from("profiles").insert({
           id: created.user.id,
+          username,
           full_name: fullName,
           role,
           phone: String(body.phone ?? "").trim() || null,
         });
         if (profileErr) {
           await admin.auth.admin.deleteUser(created.user.id);
-          return fail("Profil kaydedilemedi: " + profileErr.message, 500);
+          return fail(
+            profileErr.code === "23505"
+              ? `"${username}" kullanıcı adı zaten alınmış.`
+              : "Profil kaydedilemedi: " + profileErr.message,
+            400,
+          );
         }
 
         const { error: secretErr } = await admin.rpc("upsert_user_secret", {
@@ -80,15 +99,10 @@ Deno.serve(async (req) => {
         });
         if (secretErr) {
           await admin.auth.admin.deleteUser(created.user.id);
-          return fail(
-            secretErr.message.includes("duplicate")
-              ? "Bu şifre başka bir kullanıcıda kullanılıyor. Başka bir şifre seçin."
-              : "Şifre kaydedilemedi: " + secretErr.message,
-            400,
-          );
+          return fail("Şifre kaydedilemedi: " + secretErr.message, 400);
         }
 
-        return json({ id: created.user.id, full_name: fullName, role, code });
+        return json({ id: created.user.id, username, full_name: fullName, role, code });
       }
 
       case "reset_code": {
@@ -103,14 +117,7 @@ Deno.serve(async (req) => {
           p_email: null,
           p_password: null,
         });
-        if (error) {
-          return fail(
-            error.message.includes("duplicate")
-              ? "Bu şifre başka bir kullanıcıda kullanılıyor."
-              : error.message,
-            400,
-          );
-        }
+        if (error) return fail(error.message, 400);
         return json({ id: profileId, code });
       }
 
@@ -118,6 +125,11 @@ Deno.serve(async (req) => {
         const profileId = String(body.profile_id ?? "");
         if (!profileId) return fail("Kullanıcı belirtilmedi.");
         const patch: Record<string, unknown> = {};
+        if (body.username !== undefined) {
+          const u = normalizeUsername(body.username);
+          if (!u) return fail("Geçersiz kullanıcı adı.");
+          patch.username = u;
+        }
         if (body.full_name !== undefined) patch.full_name = String(body.full_name).trim();
         if (body.phone !== undefined) patch.phone = String(body.phone).trim() || null;
         if (body.role !== undefined) {
@@ -127,7 +139,12 @@ Deno.serve(async (req) => {
         if (body.is_active !== undefined) patch.is_active = Boolean(body.is_active);
 
         const { error } = await admin.from("profiles").update(patch).eq("id", profileId);
-        if (error) return fail(error.message, 400);
+        if (error) {
+          return fail(
+            error.code === "23505" ? "Bu kullanıcı adı zaten alınmış." : error.message,
+            400,
+          );
+        }
         return json({ ok: true });
       }
 

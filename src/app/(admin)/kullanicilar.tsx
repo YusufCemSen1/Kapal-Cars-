@@ -12,6 +12,7 @@ import { bosluk, renk, yuvarlak } from "@/lib/theme";
 
 type Kullanici = {
   id: string;
+  username: string;
   full_name: string;
   role: Rol;
   phone: string | null;
@@ -58,18 +59,21 @@ export default function AdminKullanicilar() {
   const [liste, setListe] = useState<Kullanici[]>([]);
   const [formAcik, setFormAcik] = useState(false);
   const [ad, setAd] = useState("");
+  const [kullaniciAdi, setKullaniciAdi] = useState("");
   const [telefon, setTelefon] = useState("");
   const [rol, setRol] = useState<Rol>("ortaci");
   const [ozelSifre, setOzelSifre] = useState("");
   const [islemde, setIslemde] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  const [yeniSifre, setYeniSifre] = useState<{ ad: string; kod: string } | null>(null);
+  const [yeniSifre, setYeniSifre] = useState<
+    { ad: string; kullaniciAdi: string; kod: string } | null
+  >(null);
   const [yenileniyor, setYenileniyor] = useState(false);
 
   const yukle = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id,full_name,role,phone,is_active,is_available,created_at")
+      .select("id,username,full_name,role,phone,is_active,is_available,created_at")
       .order("role")
       .order("full_name");
     setListe((data as Kullanici[]) ?? []);
@@ -95,15 +99,25 @@ export default function AdminKullanicilar() {
 
   async function olustur() {
     await calistir(async () => {
-      const sonuc = await callFunction<{ code: string; full_name: string }>("admin-users", {
+      const sonuc = await callFunction<{
+        code: string;
+        username: string;
+        full_name: string;
+      }>("admin-users", {
         action: "create",
+        username: kullaniciAdi.trim().toLowerCase(),
         full_name: ad.trim(),
         role: rol,
         phone: telefon.trim() || null,
         code: ozelSifre.trim() || undefined,
       });
-      setYeniSifre({ ad: sonuc.full_name, kod: sonuc.code });
+      setYeniSifre({
+        ad: sonuc.full_name,
+        kullaniciAdi: sonuc.username,
+        kod: sonuc.code,
+      });
       setAd("");
+      setKullaniciAdi("");
       setTelefon("");
       setOzelSifre("");
       setFormAcik(false);
@@ -117,7 +131,7 @@ export default function AdminKullanicilar() {
           action: "reset_code",
           profile_id: k.id,
         });
-        setYeniSifre({ ad: k.full_name, kod: sonuc.code });
+        setYeniSifre({ ad: k.full_name, kullaniciAdi: k.username, kod: sonuc.code });
       }),
     );
   }
@@ -154,8 +168,15 @@ export default function AdminKullanicilar() {
     >
       {yeniSifre ? (
         <Kart style={st.sifreKart}>
-          <Text style={st.sifreBaslik}>{yeniSifre.ad} için kişisel şifre</Text>
-          <Text style={st.sifreKod}>{yeniSifre.kod}</Text>
+          <Text style={st.sifreBaslik}>{yeniSifre.ad} — giriş bilgileri</Text>
+          <View style={st.bilgiSatir}>
+            <Text style={st.bilgiEtiket}>Kullanıcı adı</Text>
+            <Text style={st.bilgiDeger}>{yeniSifre.kullaniciAdi}</Text>
+          </View>
+          <View style={st.bilgiSatir}>
+            <Text style={st.bilgiEtiket}>Şifre</Text>
+            <Text style={st.sifreKod}>{yeniSifre.kod}</Text>
+          </View>
           <Text style={st.sifreNot}>
             Bu şifre bir daha gösterilmez. Kullanıcıya iletin.
           </Text>
@@ -166,8 +187,10 @@ export default function AdminKullanicilar() {
               tur="ikincil"
               kucuk
               onPress={async () => {
-                await Clipboard.setStringAsync(yeniSifre.kod);
-                bilgiVer("Kopyalandı", "Şifre panoya kopyalandı.");
+                await Clipboard.setStringAsync(
+                  `Kullanıcı adı: ${yeniSifre.kullaniciAdi}\nŞifre: ${yeniSifre.kod}`,
+                );
+                bilgiVer("Kopyalandı", "Giriş bilgileri panoya kopyalandı.");
               }}
             />
             <Dugme baslik="Tamam" tur="sade" kucuk onPress={() => setYeniSifre(null)} />
@@ -181,6 +204,15 @@ export default function AdminKullanicilar() {
         <Kart style={{ gap: bosluk.md }}>
           <Text style={st.kartBaslik}>Yeni kullanıcı</Text>
           <Alan etiket="Ad soyad" value={ad} onChangeText={setAd} placeholder="Örn. Ahmet Yılmaz" />
+          <Alan
+            etiket="Kullanıcı adı"
+            value={kullaniciAdi}
+            onChangeText={(t) => setKullaniciAdi(t.toLowerCase())}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="ahmet.yilmaz"
+            ipucu="Küçük harf, rakam, nokta ve alt çizgi; 3-24 karakter."
+          />
           <View style={{ gap: 6 }}>
             <Text style={st.etiket}>Görev</Text>
             <View style={st.rolSatir}>
@@ -222,7 +254,7 @@ export default function AdminKullanicilar() {
               baslik="Oluştur"
               ikon="person-add"
               yukleniyor={islemde}
-              pasif={ad.trim().length < 2}
+              pasif={ad.trim().length < 2 || !/^[a-z0-9._]{3,24}$/.test(kullaniciAdi.trim())}
               onPress={olustur}
             />
             <Dugme baslik="Vazgeç" tur="sade" onPress={() => setFormAcik(false)} />
@@ -249,9 +281,10 @@ export default function AdminKullanicilar() {
                   {benMiyim ? " (siz)" : ""}
                 </Text>
                 <Text style={st.alt}>
-                  {k.phone ? `${k.phone} · ` : ""}
-                  {tarihSaat(k.created_at)}
+                  @{k.username}
+                  {k.phone ? ` · ${k.phone}` : ""}
                 </Text>
+                <Text style={st.alt}>{tarihSaat(k.created_at)}</Text>
               </View>
               <Rozet metin={r.etiket} bg={r.bg} fg={r.fg} />
             </View>
@@ -334,7 +367,15 @@ const st = StyleSheet.create({
 
   sifreKart: { backgroundColor: renk.yesilAcik, borderColor: renk.yesil, gap: bosluk.sm },
   sifreBaslik: { fontSize: 13.5, fontWeight: "700", color: renk.yesil },
-  sifreKod: { fontSize: 30, fontWeight: "900", letterSpacing: 5, color: renk.metin },
+  sifreKod: { fontSize: 22, fontWeight: "900", letterSpacing: 3, color: renk.metin },
+  bilgiSatir: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: bosluk.md,
+  },
+  bilgiEtiket: { fontSize: 12.5, fontWeight: "700", color: renk.yesil },
+  bilgiDeger: { fontSize: 18, fontWeight: "800", color: renk.metin },
   sifreNot: { fontSize: 12, color: renk.yesil },
   sifreAksiyon: { flexDirection: "row", gap: bosluk.sm },
 

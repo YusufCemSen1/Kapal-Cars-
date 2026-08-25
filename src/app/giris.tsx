@@ -19,6 +19,7 @@ import { bosluk, renk, yuvarlak } from "@/lib/theme";
 export default function Giris() {
   const { girisYap } = useAuth();
   const inset = useSafeAreaInsets();
+  const [kullaniciAdi, setKullaniciAdi] = useState("");
   const [sifre, setSifre] = useState("");
   const [gizli, setGizli] = useState(true);
   const [hata, setHata] = useState<string | null>(null);
@@ -27,13 +28,17 @@ export default function Giris() {
   async function gonder() {
     if (yukleniyor) return;
     setHata(null);
+    if (!kullaniciAdi.trim()) {
+      setHata("Kullanıcı adınızı girin.");
+      return;
+    }
     if (sifre.trim().length < 4) {
       setHata("Şifrenizi eksiksiz girin.");
       return;
     }
     setYukleniyor(true);
     try {
-      await girisYap(sifre.trim());
+      await girisYap(kullaniciAdi.trim().toLowerCase(), sifre.trim());
       setSifre("");
     } catch (e) {
       setHata((e as Error).message);
@@ -58,6 +63,22 @@ export default function Giris() {
         <Text style={st.altYazi}>Şoför · Ortacı · Yönetim</Text>
 
         <View style={st.kart}>
+          <Text style={st.etiket}>Kullanıcı adınız</Text>
+          <View style={st.girdiSarmal}>
+            <Ionicons name="person-outline" size={19} color={renk.soluk} />
+            <TextInput
+              value={kullaniciAdi}
+              onChangeText={setKullaniciAdi}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              placeholder="kullanici.adi"
+              placeholderTextColor="#94A3B8"
+              style={st.girdiAd}
+              returnKeyType="next"
+            />
+          </View>
+
           <Text style={st.etiket}>Kişisel şifreniz</Text>
           <View style={st.girdiSarmal}>
             <TextInput
@@ -149,6 +170,12 @@ const st = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 18,
     letterSpacing: 3,
+    color: renk.metin,
+  },
+  girdiAd: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
     color: renk.metin,
   },
   dipnot: {

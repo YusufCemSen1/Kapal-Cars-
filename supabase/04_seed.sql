@@ -12,7 +12,8 @@ do $$
 declare
   v_email    text := 'admin@kapalicarsi.local';  -- ADIM 1'de girdiğiniz e-posta
   v_password text := 'BURAYA_ADIM1_SIFRESI';     -- ADIM 1'de girdiğiniz şifre
-  v_code     text := '123456';                   -- yöneticinin uygulamaya gireceği KİŞİSEL ŞİFRE
+  v_user     text := 'admin';                    -- uygulamaya girerken yazılacak KULLANICI ADI
+  v_code     text := '123456';                   -- uygulamaya girerken yazılacak KİŞİSEL ŞİFRE
   v_name     text := 'Yönetici';
   v_uid      uuid;
 begin
@@ -21,12 +22,13 @@ begin
     raise exception 'Önce Supabase panelinden % e-postalı kullanıcıyı oluşturun.', v_email;
   end if;
 
-  insert into public.profiles(id, full_name, role)
-  values (v_uid, v_name, 'admin')
-  on conflict (id) do update set full_name = excluded.full_name, role = 'admin';
+  insert into public.profiles(id, username, full_name, role)
+  values (v_uid, lower(v_user), v_name, 'admin')
+  on conflict (id) do update
+    set username = excluded.username, full_name = excluded.full_name, role = 'admin';
 
   perform public.upsert_user_secret(v_uid, v_code, v_email, v_password);
-  raise notice 'Yönetici hazır. Uygulamaya giriş şifresi: %', v_code;
+  raise notice 'Yönetici hazır. Kullanıcı adı: % / şifre: %', v_user, v_code;
 end $$;
 
 -- ------------------------------------------------------- örnek mağazalar

@@ -23,6 +23,9 @@ exception when duplicate_object then null; end $$;
 -- ------------------------------------------------------------- profiller
 create table if not exists public.profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
+  username      text        not null unique
+                check (username = lower(username)
+                       and username ~ '^[a-z0-9._]{3,24}$'),
   full_name     text        not null,
   role          user_role   not null,
   phone         text,
@@ -38,20 +41,10 @@ create index if not exists profiles_role_idx on public.profiles(role) where is_a
 create table if not exists public.user_secrets (
   profile_id       uuid primary key references public.profiles(id) on delete cascade,
   code_hash        text not null,            -- bcrypt(kişisel şifre)
-  code_fingerprint text not null unique,     -- sha256(şifre||pepper) — hızlı ve tekil arama
   auth_email       text not null,
   auth_password    text not null,
   updated_at       timestamptz not null default now()
 );
-
--- pepper vb. sunucu sırları
-create table if not exists public.app_private (
-  key   text primary key,
-  value text not null
-);
-insert into public.app_private(key, value)
-values ('code_pepper', encode(extensions.gen_random_bytes(32), 'hex'))
-on conflict (key) do nothing;
 
 -- --------------------------------------------------------------- mağazalar
 create table if not exists public.shops (

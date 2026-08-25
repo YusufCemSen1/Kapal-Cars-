@@ -1,5 +1,4 @@
-// Kişisel şifre ile giriş.
-// Kullanıcı yalnızca şifresini yazar; e-posta/kullanıcı adı yoktur.
+// Kullanıcı adı + kişisel şifre ile giriş.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { cors, fail, json } from "../_shared/util.ts";
 
@@ -11,26 +10,33 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return fail("Yalnızca POST", 405);
 
+  let username = "";
   let code = "";
   try {
-    code = String((await req.json())?.code ?? "").trim();
+    const body = await req.json();
+    username = String(body?.username ?? "").trim().toLowerCase();
+    code = String(body?.code ?? "").trim();
   } catch {
     return fail("Geçersiz istek");
   }
+  if (!username) return fail("Kullanıcı adı gerekli.");
   if (code.length < 4) return fail("Şifre en az 4 karakter olmalı.");
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false },
   });
 
-  const { data, error } = await admin.rpc("login_lookup", { p_code: code });
+  const { data, error } = await admin.rpc("login_lookup", {
+    p_username: username,
+    p_code: code,
+  });
   if (error) return fail("Giriş doğrulanamadı.", 500);
 
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) {
     // Kaba kuvvet denemelerini yavaşlat
     await new Promise((r) => setTimeout(r, 600));
-    return fail("Şifre hatalı.", 401);
+    return fail("Kullanıcı adı veya şifre hatalı.", 401);
   }
   if (!row.is_active) return fail("Hesabınız kapatılmış. Yönetici ile görüşün.", 403);
 
@@ -47,6 +53,7 @@ Deno.serve(async (req) => {
     session: session.session,
     profile: {
       id: row.profile_id,
+      username,
       full_name: row.full_name,
       role: row.role,
     },

@@ -14,6 +14,7 @@ export type Rol = "admin" | "sofor" | "ortaci";
 
 export type Profil = {
   id: string;
+  username: string;
   full_name: string;
   role: Rol;
   phone: string | null;
@@ -24,7 +25,7 @@ export type Profil = {
 type AuthDurumu = {
   hazir: boolean;
   profil: Profil | null;
-  girisYap: (sifre: string) => Promise<Profil>;
+  girisYap: (kullaniciAdi: string, sifre: string) => Promise<Profil>;
   cikisYap: () => Promise<void>;
   profiliYenile: () => Promise<void>;
   musaitlikAyarla: (musait: boolean) => Promise<void>;
@@ -79,10 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [profiliCek]);
 
   const girisYap = useCallback(
-    async (sifre: string) => {
+    async (kullaniciAdi: string, sifre: string) => {
       const sonuc = await callFunction<{
         session: { access_token: string; refresh_token: string };
-      }>("login", { code: sifre });
+      }>("login", { username: kullaniciAdi, code: sifre });
 
       const { error } = await supabase.auth.setSession({
         access_token: sonuc.session.access_token,

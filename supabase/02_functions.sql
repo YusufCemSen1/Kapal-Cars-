@@ -29,10 +29,10 @@ end $$;
 
 -- Oturum sahibinin kendi profili
 create or replace function public.me()
-returns table (id uuid, full_name text, role user_role, phone text,
+returns table (id uuid, username text, full_name text, role user_role, phone text,
                is_active boolean, is_available boolean)
 language sql stable security definer set search_path = public as $$
-  select p.id, p.full_name, p.role, p.phone, p.is_active, p.is_available
+  select p.id, p.username, p.full_name, p.role, p.phone, p.is_active, p.is_available
     from public.profiles p where p.id = auth.uid()
 $$;
 
@@ -545,25 +545,21 @@ returns void language sql security definer set search_path = public as $$
 $$;
 
 -- =============================================== GİRİŞ (yalnızca service_role)
--- Kişisel şifreyi doğrular, Supabase Auth kimlik bilgisini döner.
-create or replace function public.login_lookup(p_code text)
+-- Kullanıcı adı + kişisel şifreyi doğrular, Supabase Auth kimlik bilgisini döner.
+drop function if exists public.login_lookup(text);
+
+create or replace function public.login_lookup(p_username text, p_code text)
 returns table (profile_id uuid, auth_email text, auth_password text,
                full_name text, role user_role, is_active boolean)
-language plpgsql security definer set search_path = public, extensions as $$
-declare v_pepper text; v_fp text;
-begin
-  select value into v_pepper from public.app_private where key = 'code_pepper';
-  v_fp := encode(extensions.digest(p_code || v_pepper, 'sha256'), 'hex');
-
-  return query
+language sql security definer set search_path = public, extensions as $$
   select p.id, s.auth_email, s.auth_password, p.full_name, p.role, p.is_active
-    from public.user_secrets s
-    join public.profiles p on p.id = s.profile_id
-   where s.code_fingerprint = v_fp
-     and s.code_hash = extensions.crypt(p_code, s.code_hash);
-end $$;
-revoke all on function public.login_lookup(text) from public, anon, authenticated;
-grant execute on function public.login_lookup(text) to service_role;
+    from public.profiles p
+    join public.user_secrets s on s.profile_id = p.id
+   where p.username = lower(trim(p_username))
+     and s.code_hash = extensions.crypt(p_code, s.code_hash)
+$$;
+revoke all on function public.login_lookup(text, text) from public, anon, authenticated;
+grant execute on function public.login_lookup(text, text) to service_role;
 
 -- Kullanıcı oluşturma/şifre atama (service_role tarafından Edge Function ile çağrılır)
 create or replace function public.upsert_user_secret(
@@ -571,12 +567,11 @@ create or replace function public.upsert_user_secret(
 returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare
-  v_pepper text; v_email text; v_password text;
+  v_email text; v_password text;
 begin
   if length(coalesce(p_code,'')) < 4 then
     raise exception 'Şifre en az 4 karakter olmalı.' using errcode='P0001';
   end if;
-  select value into v_pepper from public.app_private where key = 'code_pepper';
 
   select auth_email, auth_password into v_email, v_password
     from public.user_secrets where profile_id = p_profile;
@@ -587,17 +582,13 @@ begin
     raise exception 'Kullanıcının kimlik bilgisi eksik.' using errcode='P0001';
   end if;
 
-  insert into public.user_secrets(profile_id, code_hash, code_fingerprint, auth_email, auth_password)
-  values (p_profile,
-          extensions.crypt(p_code, extensions.gen_salt('bf')),
-          encode(extensions.digest(p_code || v_pepper, 'sha256'), 'hex'),
-          v_email, v_password)
+  insert into public.user_secrets(profile_id, code_hash, auth_email, auth_password)
+  values (p_profile, extensions.crypt(p_code, extensions.gen_salt('bf')), v_email, v_password)
   on conflict (profile_id) do update
-     set code_hash        = excluded.code_hash,
-         code_fingerprint = excluded.code_fingerprint,
-         auth_email       = excluded.auth_email,
-         auth_password    = excluded.auth_password,
-         updated_at       = now();
+     set code_hash     = excluded.code_hash,
+         auth_email    = excluded.auth_email,
+         auth_password = excluded.auth_password,
+         updated_at    = now();
 end $$;
 revoke all on function public.upsert_user_secret(uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.upsert_user_secret(uuid, text, text, text) to service_role;
