@@ -49,26 +49,32 @@ yalnızca yenilenebilir.
 
 ### 1. Supabase projesi
 
-1. [supabase.com](https://supabase.com) üzerinde yeni proje açın.
-2. **SQL Editor**'de sırayla çalıştırın:
-   `supabase/01_schema.sql` → `02_functions.sql` → `03_rls.sql`
-3. **Authentication → Users → Add user** ile bir kullanıcı oluşturun
-   (örn. `admin@kapalicarsi.local`, güçlü bir şifre, *Auto Confirm* açık).
-4. `supabase/04_seed.sql` dosyasının başındaki üç değeri doldurup çalıştırın.
-   Bu, ilk yöneticiyi ve örnek mağazaları oluşturur.
+1. [supabase.com](https://supabase.com) üzerinde ücretsiz bir proje açın.
+2. Terminalde bir kez giriş yapın ve projeyi bağlayın:
+
+```bash
+npx supabase login
+npx supabase link --project-ref <proje-ref>
+```
+
+3. Şemayı ve ilk yöneticiyi kurun:
+
+```bash
+npx supabase db push
+```
+
+Bu komut tabloları, iş kurallarını, güvenlik kurallarını ve **admin / 123456**
+hesabını oluşturur. İlk girişten sonra bu şifreyi Kullanıcılar ekranından değiştirin.
 
 ### 2. Edge Function'lar
 
 ```bash
-npm i -g supabase
-supabase login
-supabase link --project-ref <proje-ref>
-supabase functions deploy login --no-verify-jwt
-supabase functions deploy admin-users
+npx supabase functions deploy login
+npx supabase functions deploy admin-users
 ```
 
-`login` fonksiyonu giriş yapılmadan çağrıldığı için `--no-verify-jwt` ile yayınlanır;
-kendi içinde şifreyi doğrular. `admin-users` çağıranın yönetici olduğunu denetler.
+`login` oturum açılmadan çağrıldığı için `config.toml` içinde JWT doğrulaması
+kapalıdır; fonksiyon kullanıcı adı + şifreyi kendi içinde doğrular.
 
 ### 3. Uygulama
 

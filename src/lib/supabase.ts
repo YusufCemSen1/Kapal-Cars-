@@ -5,8 +5,13 @@ import "react-native-url-polyfill/auto";
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-/** .env dosyası doldurulmadıysa uygulama çökmek yerine kurulum ekranı gösterir. */
-export const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+/**
+ * .env doldurulmadıysa (ya da örnek değerler duruyorsa) uygulama anlaşılmaz bir
+ * ağ hatası yerine kurulum uyarısı gösterir.
+ */
+export const isConfigured =
+  /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(SUPABASE_URL.trim()) &&
+  SUPABASE_ANON_KEY.trim().length > 40;
 
 export const supabase = createClient(
   SUPABASE_URL || "http://localhost",

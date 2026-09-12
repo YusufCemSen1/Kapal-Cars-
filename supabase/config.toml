@@ -1,0 +1,36 @@
+project_id = "ortaci-plus"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+# Giriş fonksiyonu oturum açılmadan çağrıldığı için JWT doğrulaması kapalı;
+# kendi içinde kullanıcı adı + şifre doğrular.
+[functions.login]
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = true
